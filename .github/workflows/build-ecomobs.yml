@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Auxilor/EcoMobs
-          ref: master
+          ref: e006bf30f93837fed51b9775c5bf1ae9ac21d07a
           path: source
 
       - name: Set up JDK 25
@@ -28,21 +28,29 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build EcoMobs libreforge JAR
+      - name: Build final EcoMobs JAR with embedded relocated LibReforge
         working-directory: source
         run: |
           chmod +x gradlew
           ./gradlew clean libreforgeJar --full-stacktrace
 
-      - name: Show generated JARs
-        if: always()
-        run: find source -path '*/build/libs/*.jar' -type f -print || true
+      - name: Verify final JAR
+        working-directory: source
+        run: |
+          set -euo pipefail
+          FINAL_JAR=$(find bin -maxdepth 1 -type f -name '*.jar' | head -n 1)
+          echo "Final JAR: $FINAL_JAR"
+          test -n "$FINAL_JAR"
+          unzip -l "$FINAL_JAR" | grep 'libreforge-2026.42-shadow.jar'
+          unzip -p "$FINAL_JAR" 'libreforge-2026.42-shadow.jar' > /tmp/libreforge-shadow.jar
+          javap -classpath /tmp/libreforge-shadow.jar -c com.willfp.libreforge.LibreforgeSpigotPlugin > /tmp/libreforge-javap.txt
+          grep 'com/willfp/eco/libs/kotlin/jvm/functions/Function0' /tmp/libreforge-javap.txt
+          unzip -p "$FINAL_JAR" plugin.yml | grep -E 'name: EcoMobs|version: 2026.42'
 
-      - name: Upload EcoMobs libreforge JAR
-        if: success()
+      - name: Upload verified final EcoMobs JAR
         uses: actions/upload-artifact@v4
         with:
-          name: EcoMobs-2026.42-libreforge
-          path: source/build/libs/*.jar
+          name: EcoMobs-2026.42-FINAL
+          path: source/bin/*.jar
           if-no-files-found: error
           retention-days: 7
